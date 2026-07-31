@@ -99,13 +99,56 @@ const webStyles = () => {
   }
 }
 
+// The server-rendered /login page (hermes_cli/dashboard_auth/login_page.py)
+// loads the brand fonts from stable /fonts/ URLs — a path the old dashboard
+// build shipped but this bundle hashes into /assets/. Emit the exact files the
+// login page @font-faces reference so it renders in Collapse like the app.
+const LOGIN_FONTS = [
+  'Collapse-Regular.woff2',
+  'Collapse-Bold.woff2',
+  'RulesCompressed-Regular.woff2',
+  'RulesCompressed-Medium.woff2'
+]
+
+const fontsDir =
+  real(path.resolve(__dirname, 'node_modules/@nous-research/ui/dist/fonts')) ??
+  real(path.resolve(__dirname, '../../node_modules/@nous-research/ui/dist/fonts'))
+
+const loginFontAssets = () => ({
+  name: 'hermes:login-font-assets',
+  configureServer(server: {
+    middlewares: { use: (route: string, handler: (req: any, res: any, next: () => void) => void) => void }
+  }) {
+    server.middlewares.use('/fonts', (req, res, next) => {
+      const rel = (req.url ?? '').split('?')[0].replace(/^\/+/, '')
+      if (!fontsDir || !LOGIN_FONTS.includes(rel)) return next()
+      fs.readFile(path.join(fontsDir, rel), (err: unknown, buf: Buffer) => {
+        if (err) return next()
+        res.setHeader('Content-Type', 'font/woff2')
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        res.end(buf)
+      })
+    })
+  },
+  generateBundle(this: { emitFile: (asset: { type: 'asset'; fileName: string; source: Uint8Array }) => void }) {
+    if (!fontsDir) return
+    for (const rel of LOGIN_FONTS) {
+      this.emitFile({
+        type: 'asset',
+        fileName: `fonts/${rel}`,
+        source: fs.readFileSync(path.join(fontsDir, rel))
+      })
+    }
+  }
+})
+
 export default defineConfig(({ command }) => ({
   // Absolute base (unlike the desktop's './'): the dashboard's mount_spa()
   // rewrites absolute `/assets/...` URLs for reverse-proxy path prefixes
   // (X-Forwarded-Prefix), so the build must emit absolute asset URLs.
   base: '/',
   publicDir: path.resolve(__dirname, '../desktop/public'),
-  plugins: [webStyles(), react(), tailwindcss(), emojibaseAssets()],
+  plugins: [webStyles(), react(), tailwindcss(), emojibaseAssets(), loginFontAssets()],
   define: {
     // Renderer-source branches: `import.meta.env.HERMES_WEB` is true only in
     // this build, letting shared source gate desktop-only UI with dead-code
