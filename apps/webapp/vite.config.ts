@@ -142,13 +142,36 @@ const loginFontAssets = () => ({
   }
 })
 
+// Hermes Watch: a self-contained companion page for smartwatch browsers
+// (src/watch.html — no framework, inline everything). Emitted verbatim at
+// /watch.html; the SPA fallback router serves real files first, so no server
+// change is needed.
+const watchPage = () => ({
+  name: 'hermes:watch-page',
+  configureServer(server: {
+    middlewares: { use: (route: string, handler: (req: any, res: any, next: () => void) => void) => void }
+  }) {
+    server.middlewares.use('/watch.html', (_req, res) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.end(fs.readFileSync(path.resolve(__dirname, 'src/watch.html')))
+    })
+  },
+  generateBundle(this: { emitFile: (asset: { type: 'asset'; fileName: string; source: Uint8Array }) => void }) {
+    this.emitFile({
+      type: 'asset',
+      fileName: 'watch.html',
+      source: fs.readFileSync(path.resolve(__dirname, 'src/watch.html'))
+    })
+  }
+})
+
 export default defineConfig(({ command }) => ({
   // Absolute base (unlike the desktop's './'): the dashboard's mount_spa()
   // rewrites absolute `/assets/...` URLs for reverse-proxy path prefixes
   // (X-Forwarded-Prefix), so the build must emit absolute asset URLs.
   base: '/',
   publicDir: path.resolve(__dirname, '../desktop/public'),
-  plugins: [webStyles(), react(), tailwindcss(), emojibaseAssets(), loginFontAssets()],
+  plugins: [webStyles(), react(), tailwindcss(), emojibaseAssets(), loginFontAssets(), watchPage()],
   define: {
     // Renderer-source branches: `import.meta.env.HERMES_WEB` is true only in
     // this build, letting shared source gate desktop-only UI with dead-code

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#000000" />
+    <title>Hermes Watch</title>
+    <style>
+      /* Hermes Watch — a single-purpose remote for tiny screens.
+         Dark by design: round smartwatch bezels are black, so a black canvas
+         makes the clipped corners invisible. Everything is sized in vmin so
+         1.2"–1.9" round and square faces lay out identically. */
+      * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+      html, body { height: 100%; }
+      body {
+        background: #000;
+        color: #ececf1;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex;
+        flex-direction: column;
+        padding: max(4vmin, env(safe-area-inset-top)) 6vmin max(4vmin, env(safe-area-inset-bottom));
+        gap: 3vmin;
+        overflow: hidden;
+      }
+      header {
+        text-align: center;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        font-size: 4.2vmin;
+        color: #4d7dff;
+        text-transform: uppercase;
+        flex: none;
+      }
+      header .dot {
+        display: inline-block;
+        width: 2vmin; height: 2vmin;
+        border-radius: 50%;
+        margin-left: 1.5vmin;
+        background: #555;
+        vertical-align: middle;
+        transition: background 0.3s;
+      }
+      header .dot.ok { background: #2ecc71; }
+      header .dot.err { background: #e74c3c; }
+      #reply {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        font-size: 5vmin;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        scrollbar-width: none;
+        padding: 0 1vmin;
+      }
+      #reply::-webkit-scrollbar { display: none; }
+      #reply .muted { color: #8a8a93; }
+      #reply .you { color: #4d7dff; font-weight: 600; }
+      form { flex: none; display: flex; gap: 2.5vmin; }
+      input {
+        flex: 1;
+        min-width: 0;
+        background: #141419;
+        border: 1px solid #2c2c35;
+        border-radius: 999px;
+        color: #ececf1;
+        font-size: 16px; /* keeps mobile browsers from zooming on focus */
+        padding: 3vmin 4.5vmin;
+        outline: none;
+      }
+      input:focus { border-color: #4d7dff; }
+      button {
+        flex: none;
+        width: 13vmin; height: 13vmin;
+        min-width: 44px; min-height: 44px;
+        border-radius: 50%;
+        border: 0;
+        background: #0053fd;
+        color: #fff;
+        font-size: 6vmin;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+      }
+      button:disabled { background: #26262e; color: #666; }
+      #quick {
+        flex: none;
+        display: flex;
+        gap: 2vmin;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      #quick button {
+        width: auto; height: auto;
+        border-radius: 999px;
+        background: #141419;
+        border: 1px solid #2c2c35;
+        color: #b9b9c3;
+        font-size: 3.6vmin;
+        padding: 2vmin 3.5vmin;
+      }
+      .spin {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <header>Hermes<span class="dot" id="dot"></span></header>
+    <div id="reply"><span class="muted">Connecting…</span></div>
+    <div id="quick" hidden>
+      <button type="button" data-q="Good morning! Anything need my attention today?">☀️ Brief me</button>
+      <button type="button" data-q="Summarize the latest session in two sentences.">📝 Latest</button>
+    </div>
+    <form id="form">
+      <input id="input" type="text" placeholder="Ask Hermes…" autocomplete="off" enterkeyhint="send" />
+      <button id="send" type="submit" disabled>➤</button>
+    </form>
+
+    <script>
+      // Minimal JSON-RPC client over the dashboard gateway WebSocket.
+      // Auth: single-use ticket via cookies (gated deployments). A 401 kicks
+      // to the login page and returns here. For token-mode dev servers pass
+      // ?token=<session token> in the URL instead.
+      const $ = id => document.getElementById(id)
+      const reply = $('reply'), input = $('input'), send = $('send'), dot = $('dot'), quick = $('quick')
+      const urlToken = new URLSearchParams(location.search).get('token') || ''
+
+      let ws = null, rpcId = 0, sessionId = '', busy = false
+      const pending = new Map()
+
+      const setStatus = state => { dot.className = 'dot' + (state ? ' ' + state : '') }
+      const show = (html, cls) => { reply.innerHTML = cls ? `<span class="${cls}">${html}</span>` : html }
+
+      function rpc(method, params) {
+        return new Promise((resolve, reject) => {
+          const id = ++rpcId
+          pending.set(id, { resolve, reject })
+          ws.send(JSON.stringify({ jsonrpc: '2.0', id, method, params: params || {} }))
+        })
+      }
+
+      async function wsUrl() {
+        if (urlToken) {
+          return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws?token=${encodeURIComponent(urlToken)}`
+        }
+        const res = await fetch('/api/auth/ws-ticket', { method: 'POST', credentials: 'same-origin' })
+        if (res.status === 401 || res.status === 403) {
+          location.href = '/login?next=' + encodeURIComponent('/watch.html')
+          throw new Error('login required')
+        }
+        if (!res.ok) throw new Error('ticket mint failed: ' + res.status)
+        const { ticket } = await res.json()
+        return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws?ticket=${encodeURIComponent(ticket)}`
+      }
+
+      let streamed = ''
+
+      function onEvent(type, sid, payload) {
+        if (sid && sessionId && sid !== sessionId) return
+        if (type === 'message.delta' && payload && typeof payload.text === 'string') {
+          streamed += payload.text
+          show('')
+          reply.textContent = streamed
+          reply.scrollTop = reply.scrollHeight
+        } else if (type === 'message.complete') {
+          busy = false
+          send.disabled = false
+          send.textContent = '➤'
+        } else if (type === 'error' && payload) {
+          busy = false
+          send.disabled = false
+          send.textContent = '➤'
+          show('⚠️ ' + (payload.message || 'Something went wrong.'), 'muted')
+        }
+      }
+
+      async function connect() {
+        try {
+          const url = await wsUrl()
+          ws = new WebSocket(url)
+          ws.onmessage = ev => {
+            let msg
+            try { msg = JSON.parse(ev.data) } catch { return }
+            if (msg.id && pending.has(msg.id)) {
+              const p = pending.get(msg.id)
+              pending.delete(msg.id)
+              msg.error ? p.reject(new Error(msg.error.message || 'RPC error')) : p.resolve(msg.result)
+            } else if (msg.method === 'event' && msg.params) {
+              onEvent(msg.params.type, msg.params.session_id, msg.params.payload)
+            }
+          }
+          ws.onopen = async () => {
+            setStatus('ok')
+            show('Ready. Ask me anything.', 'muted')
+            send.disabled = false
+            quick.hidden = false
+          }
+          ws.onclose = () => {
+            setStatus('err')
+            send.disabled = true
+            show('Disconnected — retrying…', 'muted')
+            setTimeout(connect, 3000)
+          }
+        } catch (err) {
+          if (String(err).includes('login required')) return
+          setStatus('err')
+          show('⚠️ ' + err.message, 'muted')
+          setTimeout(connect, 5000)
+        }
+      }
+
+      async function submit(text) {
+        if (busy || !text.trim() || !ws || ws.readyState !== 1) return
+        busy = true
+        streamed = ''
+        send.disabled = true
+        send.innerHTML = '<span class="spin">◐</span>'
+        show(`<span class="you">You:</span> ${text.replace(/</g, '&lt;')}<br><span class="muted">Thinking…</span>`)
+        input.value = ''
+        try {
+          if (!sessionId) {
+            const created = await rpc('session.create', { title: 'Watch', source: 'watch', close_on_disconnect: true })
+            sessionId = (created && (created.session_id || created.id)) || ''
+            if (!sessionId) throw new Error('no session id from gateway')
+          }
+          await rpc('prompt.submit', { session_id: sessionId, text })
+        } catch (err) {
+          busy = false
+          send.disabled = false
+          send.textContent = '➤'
+          show('⚠️ ' + err.message, 'muted')
+        }
+      }
+
+      $('form').addEventListener('submit', ev => { ev.preventDefault(); submit(input.value) })
+      quick.addEventListener('click', ev => {
+        const q = ev.target.closest('[data-q]')
+        if (q) submit(q.getAttribute('data-q'))
+      })
+
+      connect()
+    </script>
+  </body>
+</html>
