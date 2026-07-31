@@ -33,6 +33,11 @@ services:
     image: hermes-web
     container_name: hermes-web
     restart: unless-stopped
+    # Main supervised process: the messaging/cron gateway (the dashboard is
+    # its own s6 service, enabled via HERMES_DASHBOARD=1). Without an explicit
+    # command the image defaults to the INTERACTIVE hermes CLI, which exits
+    # immediately in a TTY-less compose service and takes the container down.
+    command: ["gateway", "run"]
     networks: [hermes-internal]
     volumes:
       - hermes-data:/opt/data
