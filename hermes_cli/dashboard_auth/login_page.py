@@ -70,13 +70,34 @@ _LOGIN_HTML_TEMPLATE = """\
     src: url('/fonts/RulesCompressed-Medium.woff2') format('woff2');
   }}
 
+  /* Palette mirrors the SPA's default theme (themes/presets.ts): Nous blue
+     accent on a near-white canvas, with a dark variant via
+     prefers-color-scheme — the same pairing as the app's boot backgrounds
+     (#f7f7f7 / #111111 in index.html). */
   :root {{
-    --background-base: #170d02;
-    --background: #170d02;
-    --midground: #ffac02;
-    --foreground: #ffffff;
-    --hairline: color-mix(in srgb, #ffac02 18%, transparent);
-    --hairline-strong: color-mix(in srgb, #ffac02 35%, transparent);
+    --background-base: #f7f7f7;
+    --background: #f7f7f7;
+    --midground: #0053FD;
+    --foreground: #17171A;
+    --card: #ffffff;
+    --input-bg: #ffffff;
+    --hairline: color-mix(in srgb, #0053FD 14%, transparent);
+    --hairline-strong: color-mix(in srgb, #0053FD 28%, transparent);
+    --btn-fg: #FCFCFC;
+    color-scheme: light;
+  }}
+
+  @media (prefers-color-scheme: dark) {{
+    :root {{
+      --background-base: #111111;
+      --background: #111111;
+      --foreground: #ECECF1;
+      --card: #17171c;
+      --input-bg: #101014;
+      --hairline: color-mix(in srgb, #7ba0ff 16%, transparent);
+      --hairline-strong: color-mix(in srgb, #7ba0ff 32%, transparent);
+      color-scheme: dark;
+    }}
   }}
 
   *, *::before, *::after {{ box-sizing: border-box; }}
@@ -84,7 +105,7 @@ _LOGIN_HTML_TEMPLATE = """\
   html, body {{
     margin: 0;
     padding: 0;
-    min-height: 100%;
+    min-height: 100dvh;
     background: var(--background-base);
     color: var(--foreground);
     font-family: 'Collapse', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -133,39 +154,41 @@ _LOGIN_HTML_TEMPLATE = """\
     main {{ animation: none; }}
   }}
 
-  /* Brand wordmark above the card — same uppercase + wide-tracking
-     idiom DS Buttons use. */
+  /* App wordmark above the card — the same 'HERMES AGENT' hero the chat
+     intro renders (components/chat/intro.tsx): Collapse Bold, uppercase,
+     Nous blue. Sized with clamp so it stays on one line on phones. */
   .brand {{
+    text-align: center;
+    margin-bottom: 0.4rem;
+    font-family: 'Collapse', sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.9rem, 9.5vw, 3rem);
+    line-height: 0.95;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--midground);
+  }}
+  .brand .dot {{ display: none; }}
+  .brand-caption {{
     text-align: center;
     margin-bottom: 1.75rem;
     font-family: 'Rules Compressed', 'Collapse', sans-serif;
     font-weight: 600;
-    font-size: 1.05rem;
+    font-size: 0.72rem;
     letter-spacing: 0.32em;
     text-transform: uppercase;
-    color: var(--midground);
-  }}
-  .brand .dot {{
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    background: var(--midground);
-    margin: 0 0.55em 0.18em;
-    vertical-align: middle;
-    border-radius: 1px;
+    color: color-mix(in srgb, var(--foreground) 45%, transparent);
   }}
 
   .card {{
     position: relative;
-    padding: 2.25rem 2rem 2rem;
-    background: color-mix(in srgb, #ffffff 2%, var(--background-base));
+    padding: clamp(1.5rem, 5vw, 2.25rem) clamp(1.25rem, 4.5vw, 2rem) 2rem;
+    background: var(--card);
     border: 1px solid var(--hairline);
-    /* Hairline highlight + bevel shadow — matches DS Button SHADOW_DEFAULT
-       (`inset -1px -1px 0 #00000080, inset 1px 1px 0 #ffffff80`) at panel scale. */
+    border-radius: 0.75rem;
     box-shadow:
-      inset 1px 1px 0 0 color-mix(in srgb, #ffffff 5%, transparent),
-      inset -1px -1px 0 0 rgba(0, 0, 0, 0.4),
-      0 24px 60px -20px rgba(0, 0, 0, 0.6);
+      0 1px 2px rgba(10, 20, 60, 0.06),
+      0 24px 60px -28px color-mix(in srgb, #0053FD 30%, rgba(0, 0, 0, 0.35));
   }}
 
   h1 {{
@@ -198,7 +221,7 @@ _LOGIN_HTML_TEMPLATE = """\
     padding: 0.95rem 1rem;
     text-align: center;
     background: var(--midground);
-    color: var(--background-base);
+    color: var(--btn-fg);
     font-family: 'Collapse', sans-serif;
     font-weight: 700;
     font-size: 0.78rem;
@@ -206,19 +229,17 @@ _LOGIN_HTML_TEMPLATE = """\
     text-transform: uppercase;
     text-decoration: none;
     border: 0;
-    border-radius: 0;  /* DS Button is squared — no rounded corners. */
+    border-radius: 0.5rem;  /* Matches the SPA's primary button radius. */
     cursor: pointer;
-    box-shadow:
-      inset 1px 1px 0 0 rgba(255, 255, 255, 0.5),
-      inset -1px -1px 0 0 rgba(0, 0, 0, 0.5);
-    transition: filter 0.12s ease-out;
+    box-shadow: 0 1px 2px color-mix(in srgb, #0053FD 40%, rgba(0, 0, 0, 0.25));
+    transition: filter 0.12s ease-out, transform 0.06s ease-out;
   }}
   .provider-btn:hover {{
-    filter: brightness(1.08);
+    filter: brightness(1.1);
   }}
   .provider-btn:active {{
-    /* DS Button uses `active:invert` on the default surface. */
-    filter: invert(1);
+    filter: brightness(0.92);
+    transform: translateY(1px);
   }}
   .provider-btn:focus-visible {{
     outline: 2px solid var(--midground);
@@ -254,12 +275,12 @@ _LOGIN_HTML_TEMPLATE = """\
     width: 100%;
     box-sizing: border-box;
     padding: 0.7rem 0.8rem;
-    background: color-mix(in srgb, #000000 25%, var(--background-base));
+    background: var(--input-bg);
     color: var(--foreground);
     border: 1px solid var(--hairline-strong);
-    border-radius: 0;
+    border-radius: 0.5rem;
     font-family: 'Collapse', sans-serif;
-    font-size: 0.95rem;
+    font-size: 1rem;  /* ≥16px keeps iOS Safari from zooming the page on focus. */
   }}
   .field-input:focus-visible {{
     outline: none;
@@ -267,7 +288,7 @@ _LOGIN_HTML_TEMPLATE = """\
     box-shadow: 0 0 0 1px var(--midground);
   }}
   .form-error {{
-    color: #ff6b6b;
+    color: #C72E4D;  /* Theme `destructive` token. */
     font-size: 0.82rem;
     letter-spacing: 0.02em;
   }}
@@ -293,16 +314,17 @@ _LOGIN_HTML_TEMPLATE = """\
     margin: 0 0.6em 0.2em;
   }}
 
-  /* Selection — DS uses midground bg + background text. */
+  /* Selection — DS uses midground bg + light text. */
   ::selection {{
     background: var(--midground);
-    color: var(--background-base);
+    color: var(--btn-fg);
   }}
 </style>
 </head>
 <body>
 <main>
-  <div class="brand">Nous<span class="dot"></span>Research</div>
+  <div class="brand">Hermes Agent</div>
+  <div class="brand-caption">Nous Research</div>
   <div class="card">
     <h1>Sign in</h1>
     <p class="subtitle">Choose a sign-in method to continue to the Hermes Agent dashboard.</p>

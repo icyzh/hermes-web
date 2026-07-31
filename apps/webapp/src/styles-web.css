@@ -13,3 +13,35 @@
 
 @source '../../desktop/src';
 @source '.';
+
+/* ── Web-only responsive overrides ──────────────────────────────────────────
+ * The desktop renderer was designed for resizable desktop windows; these
+ * rules adapt the few fixed-size assumptions to phone viewports. Kept here
+ * (not in desktop/src) so upstream merges stay clean. */
+
+@media (max-width: 640px) {
+  /* Chat intro wordmark: the fit-text floor (--fit-min: 2.75rem set inline
+   * in components/chat/intro.tsx) is wider than a phone viewport at Collapse
+   * Bold + 0.08em tracking, so the hero overflows horizontally. Lower the
+   * floor on small screens — fit-text still scales up when there's room. */
+  [data-slot='aui_intro'] .fit-text {
+    --fit-min: 1.5rem !important;
+  }
+
+  /* Statusbar: `overflow-x-clip` truncates the trailing items mid-glyph on
+   * narrow screens. Let each cluster swipe-scroll instead, without painting
+   * a scrollbar across the bottom of the app. */
+  [data-slot='statusbar'] > div {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  [data-slot='statusbar'] > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Give the bar breathing room above the iOS home indicator. */
+  [data-slot='statusbar'] {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    height: calc(1.25rem + env(safe-area-inset-bottom, 0));
+  }
+}
