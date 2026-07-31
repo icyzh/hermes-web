@@ -39,6 +39,11 @@ services:
     # immediately in a TTY-less compose service and takes the container down.
     command: ["gateway", "run"]
     networks: [hermes-internal]
+    # Host-loopback publish for tailnet/tunnel fronting (tailscale serve,
+    # ssh -L). Only 127.0.0.1 on the host — Caddy/tailscale remain the only
+    # externally reachable surfaces, and the auth gate stays engaged either way.
+    ports:
+      - "127.0.0.1:9119:9119"
     volumes:
       - hermes-data:/opt/data
     environment:
