@@ -72,6 +72,20 @@ runtime/
 apps/
 !apps/shared/
 !apps/shared/**
+# Hermes Web: the browser build consumes the desktop renderer source and the
+# webapp workspace (see docker/webapp.Dockerfile). Keep their node_modules and
+# build output out of the context.
+!apps/desktop/
+!apps/desktop/**
+!apps/webapp/
+!apps/webapp/**
+!apps/bootstrap-installer/package.json
+apps/desktop/node_modules
+apps/desktop/dist
+apps/desktop/release
+apps/desktop/build
+apps/webapp/node_modules
+apps/webapp/dist
 
 # Test suite — not shipped in production images
 tests/

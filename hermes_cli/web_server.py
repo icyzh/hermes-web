@@ -15674,6 +15674,20 @@ async def events_ws(ws: WebSocket) -> None:
                     event_channels.pop(channel, None)
 
 
+# /api/terminal — user-shell PTY over WebSocket for the Hermes Web SPA
+# (apps/webapp). Opt-in via HERMES_DASHBOARD_TERMINAL=1; reuses this module's
+# WS gate helpers so credential/Host/Origin/peer policy stays in one place.
+from hermes_cli.terminal_ws import register_terminal_ws  # noqa: E402
+
+register_terminal_ws(
+    app,
+    ws_auth_reason=_ws_auth_reason,
+    ws_host_origin_reason=_ws_host_origin_reason,
+    ws_client_reason=_ws_client_reason,
+    ws_close_reason=_ws_close_reason,
+)
+
+
 def _normalise_prefix(raw: Optional[str]) -> str:
     """Normalise an X-Forwarded-Prefix header value.
 

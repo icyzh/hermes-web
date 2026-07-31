@@ -1,0 +1,33 @@
+# Caddy front door for Hermes Web.
+#
+# HERMES_WEB_DOMAIN=hermes.example.com → automatic Let's Encrypt TLS.
+# HERMES_WEB_DOMAIN=localhost (default) → Caddy's internal self-signed CA,
+# still a secure context for the mic once the cert is trusted.
+#
+# WebSocket upgrades (/api/ws, /api/pty, /api/terminal, /api/audio/…) are
+# proxied automatically — no extra config needed with Caddy.
+
+{$HERMES_WEB_DOMAIN:localhost} {
+	reverse_proxy hermes-web:9119
+
+	encode zstd gzip
+
+	header {
+		# The SPA talks only same-origin; lock the frame ancestors down.
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+# Subpath variant — serve Hermes under https://example.com/hermes/ instead:
+# the dashboard honours X-Forwarded-Prefix end-to-end (asset rewriting,
+# cookies, WS tickets), so only the proxy needs to know about the prefix.
+#
+# example.com {
+# 	handle_path /hermes/* {
+# 		reverse_proxy hermes-web:9119 {
+# 			header_up X-Forwarded-Prefix /hermes
+# 		}
+# 	}
+# }

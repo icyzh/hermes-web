@@ -1,0 +1,62 @@
+# Hermes Web — build + unit tests, and a weekly canary against fresh upstream.
+#
+# The webapp consumes apps/desktop/src in place, so upstream renderer changes
+# land here on merge. The scheduled job merges upstream/main into a throwaway
+# branch and builds, surfacing drift (new bridge methods, moved modules)
+# before a real sync — new preload methods degrade to logged no-op stubs at
+# runtime, but a red canary is the early signal to implement them properly.
+
+name: hermes-web
+
+on:
+  push:
+    paths:
+      - 'apps/webapp/**'
+      - 'apps/desktop/src/**'
+      - 'apps/shared/**'
+      - 'hermes_cli/terminal_ws.py'
+      - '.github/workflows/hermes-web.yml'
+  pull_request:
+    paths:
+      - 'apps/webapp/**'
+      - 'apps/desktop/src/**'
+      - 'apps/shared/**'
+      - 'hermes_cli/terminal_ws.py'
+  schedule:
+    # Weekly upstream-drift canary (Mon 06:00 UTC).
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Merge fresh upstream (drift canary only)
+        if: github.event_name == 'schedule'
+        run: |
+          git config user.email "ci@hermes-web"
+          git config user.name "hermes-web-ci"
+          git remote add upstream https://github.com/NousResearch/hermes-agent.git
+          git fetch upstream main --depth 50
+          git merge --no-edit upstream/main || {
+            echo "::warning::Upstream merge conflicts — manual sync needed"
+            exit 1
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install workspaces
+        run: npm install --workspace apps/webapp --workspace apps/shared --no-audit --no-fund
+
+      - name: Typecheck (polyfill against the live bridge contract)
+        run: npm run typecheck -w apps/webapp
+
+      - name: Unit tests
+        run: npm test -w apps/webapp
+
+      - name: Build SPA
+        run: npm run build -w apps/webapp

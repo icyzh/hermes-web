@@ -1,0 +1,82 @@
+# Hermes Web — self-hosted browser front end for Hermes Agent.
+#
+# One command (after `cp docker/webapp.env.example .env` and editing it):
+#
+#   ./docker/webapp-up.sh
+#
+# which builds the stock hermes-agent image, layers the web UI on top
+# (docker/webapp.Dockerfile), and starts it behind Caddy with automatic
+# HTTPS. TLS is not optional polish here: the mic (getUserMedia), clipboard,
+# and notifications only work in a secure context, so voice input NEEDS
+# https:// (or a localhost tunnel: ssh -L 9119:127.0.0.1:9119 host).
+#
+# Unlike the upstream docker-compose.yml (network_mode: host, loopback-only
+# dashboard), this stack keeps hermes on an internal network and lets Caddy
+# be the only externally published surface. The dashboard's auth gate engages
+# automatically on the non-loopback bind and fails closed unless a provider
+# is configured — set the HERMES_DASHBOARD_BASIC_AUTH_* variables (password
+# login) or HERMES_DASHBOARD_OIDC_* (your own IdP) in .env.
+
+services:
+  # Build-only pseudo-service: produces the stock `hermes-agent` image the
+  # webapp image extends. Activated by the `build` profile so it never runs.
+  hermes-base:
+    build: .
+    image: hermes-agent
+    profiles: ["build"]
+    command: ["true"]
+
+  hermes:
+    build:
+      context: .
+      dockerfile: docker/webapp.Dockerfile
+    image: hermes-web
+    container_name: hermes-web
+    restart: unless-stopped
+    networks: [hermes-internal]
+    volumes:
+      - hermes-data:/opt/data
+    environment:
+      - HERMES_UID=${HERMES_UID:-10000}
+      - HERMES_GID=${HERMES_GID:-10000}
+      - HERMES_DASHBOARD=1
+      # Password login (dashboard_auth "basic" provider). Prefer the bcrypt
+      # hash variable; the plaintext one is a convenience fallback.
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_WEB_USERNAME:?set HERMES_WEB_USERNAME in .env}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_WEB_PASSWORD:-}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH=${HERMES_WEB_PASSWORD_HASH:-}
+      # Web terminal pane (browser shell inside this container). 0 disables.
+      - HERMES_DASHBOARD_TERMINAL=${HERMES_WEB_TERMINAL:-1}
+      # Model/provider API keys — add the ones you use to .env.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+
+  caddy:
+    image: caddy:2
+    container_name: hermes-web-caddy
+    restart: unless-stopped
+    depends_on: [hermes]
+    networks: [hermes-internal]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./docker/webapp/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      # Your domain (with DNS pointing at this host) for automatic Let's
+      # Encrypt TLS — or leave the default for a self-signed localhost cert.
+      - HERMES_WEB_DOMAIN=${HERMES_WEB_DOMAIN:-localhost}
+
+networks:
+  hermes-internal:
+
+volumes:
+  hermes-data:
+  caddy-data:
+  caddy-config:

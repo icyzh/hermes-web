@@ -1,0 +1,15 @@
+/* Web build wrapper around the desktop renderer's stylesheet.
+ *
+ * Tailwind v4 auto-detects utility sources relative to the build's working
+ * directory. The desktop build runs from apps/desktop so `src/` is scanned
+ * implicitly; this build runs from apps/webapp, so without an explicit
+ * `@source` the entire desktop renderer tree is invisible to Tailwind and
+ * every utility class silently drops out of the emitted CSS.
+ *
+ * The `hermes:web-styles` plugin in vite.config.ts resolves the desktop
+ * entry's `./styles.css` import to THIS file, which re-imports the real
+ * stylesheet and registers the extra source roots. */
+@import '../../desktop/src/styles.css';
+
+@source '../../desktop/src';
+@source '.';
