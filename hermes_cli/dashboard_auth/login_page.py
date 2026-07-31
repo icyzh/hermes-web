@@ -87,18 +87,11 @@ _LOGIN_HTML_TEMPLATE = """\
     color-scheme: light;
   }}
 
-  @media (prefers-color-scheme: dark) {{
-    :root {{
-      --background-base: #111111;
-      --background: #111111;
-      --foreground: #ECECF1;
-      --card: #17171c;
-      --input-bg: #101014;
-      --hairline: color-mix(in srgb, #7ba0ff 16%, transparent);
-      --hairline-strong: color-mix(in srgb, #7ba0ff 32%, transparent);
-      color-scheme: dark;
-    }}
-  }}
+  /* No dark variant on purpose: the SPA boots into its default LIGHT theme
+     until the user picks another in Settings, and a near-black login page
+     followed by a white app reads as broken on phones in OS dark mode.
+     Keeping login pinned to the app's light palette makes the handoff
+     seamless. */
 
   *, *::before, *::after {{ box-sizing: border-box; }}
 

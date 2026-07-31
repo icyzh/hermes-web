@@ -17,9 +17,13 @@
         let bg = localStorage.getItem('hermes-boot-background')
         let scheme = localStorage.getItem('hermes-boot-color-scheme')
         if (!bg) {
-          const dark = window.matchMedia('(prefers-color-scheme: dark)').matches
-          bg = dark ? '#111111' : '#f7f7f7'
-          scheme = dark ? 'dark' : 'light'
+          // First visit: pre-paint the app's DEFAULT theme (light), not the
+          // OS scheme. The app boots light until the user picks a theme, so
+          // honoring OS dark here just adds a black flash before a white app
+          // on phones. Once a theme is chosen, applyTheme() persists these
+          // keys and the pre-paint follows the real theme.
+          bg = '#f7f7f7'
+          scheme = 'light'
         }
         document.documentElement.style.backgroundColor = bg
         if (scheme === 'dark' || scheme === 'light') {
