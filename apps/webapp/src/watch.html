@@ -127,12 +127,29 @@
       const $ = id => document.getElementById(id)
       const reply = $('reply'), input = $('input'), send = $('send'), dot = $('dot'), quick = $('quick')
       const urlToken = new URLSearchParams(location.search).get('token') || ''
+      // Keep the persistent token out of device history / bookmarks / referrers
+      // once captured (cookie-gated mode is unaffected).
+      if (urlToken) history.replaceState(null, '', location.pathname)
 
       let ws = null, rpcId = 0, sessionId = '', busy = false
       const pending = new Map()
 
       const setStatus = state => { dot.className = 'dot' + (state ? ' ' + state : '') }
-      const show = (html, cls) => { reply.innerHTML = cls ? `<span class="${cls}">${html}</span>` : html }
+      // Render payloads as text: gateway/provider error strings are untrusted
+      // input and must never reach innerHTML at the dashboard origin.
+      const show = (text, cls) => {
+        const span = document.createElement('span')
+        if (cls) span.className = cls
+        span.textContent = String(text ?? '')
+        reply.replaceChildren(span)
+        reply.scrollTop = reply.scrollHeight
+      }
+      const showYou = text => {
+        const you = document.createElement('span'); you.className = 'you'; you.textContent = 'You:'
+        const muted = document.createElement('span'); muted.className = 'muted'; muted.textContent = 'Thinking…'
+        reply.replaceChildren(you, document.createTextNode(' ' + text + ' '), muted)
+        reply.scrollTop = reply.scrollHeight
+      }
 
       function rpc(method, params) {
         return new Promise((resolve, reject) => {
@@ -218,7 +235,7 @@
         streamed = ''
         send.disabled = true
         send.innerHTML = '<span class="spin">◐</span>'
-        show(`<span class="you">You:</span> ${text.replace(/</g, '&lt;')}<br><span class="muted">Thinking…</span>`)
+        showYou(text)
         input.value = ''
         try {
           if (!sessionId) {
